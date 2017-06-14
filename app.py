@@ -3,27 +3,16 @@ from io import StringIO
 from keras.models import Sequential
 from keras.layers import Dense,Dropout
 from keras.utils.np_utils import to_categorical
+import numpy as np
 
-def create_model(output_labels):
+def create_model(inp_dim,output_labels):
     model = Sequential()
-    model.add(Dense(3,input_shape=(3,),activation='sigmoid'))
+    model.add(Dense(inp_dim,input_shape=(inp_dim,),activation='sigmoid'))
     model.add(Dropout(0.5))
-    model.add(Dense(output_dim=output_labels,activation='softmax'))
-    model.compile(loss='categorical_crossentropy',optimizer='adadelta')
+    model.add(Dense(len(output_labels),activation='softmax'))
+    model.compile(loss='sparse_categorical_crossentropy',optimizer='adadelta',metrics=['accuracy'])
     return model
 
-def create_one_hot(labels):
-    largest = labels[0]
-    out = []
-    for i in range(1,len(labels)):
-        if labels[i] > largest:
-            largest = i
-
-    for i in labels:
-        #if(i == 0):
-            #out.append([]
-        out.append([(0 if index != i else 1) for index in range(0,largest+1)])
-    return out
 
 csv = """
 id,connected_to,tag1,tag2,tag3
@@ -37,15 +26,16 @@ id,connected_to,tag1,tag2,tag3
 """
 
 df = pd.read_csv(StringIO(csv),index_col='id')
-training_data = df.loc[:4,'tag1':]
-training_labels = df.loc[:4,'connected_to']
-testing_data = df.loc[5:,'tag1':]
-testing_labels = df.loc[5:,'connected_to']
+training_data = df.loc[:4,'tag1':].values
+training_labels = df.loc[:4,'connected_to'].values
+testing_data = df.loc[5:,'tag1':].values
+testing_labels = df.loc[5:,'connected_to'].values
 
-print(to_categorical([int(i) for i in training_labels]))
-model = create_model(to_categorical([int(i) for i in training_labels]))
+cat_labels = to_categorical(training_labels)
 
-print(training_data)
-print(training_labels)
-print(testing_data)
-print(testing_labels)
+model = create_model(training_data.shape[1],cat_labels)
+
+model.fit(training_data,training_labels,epochs=500,batch_size=10)
+scores = model.evaluate(training_data,training_labels)
+print(model.summary())
+print("\n{}: {}%".format(model.metrics[0],scores[1]*100))
